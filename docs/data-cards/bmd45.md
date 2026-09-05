@@ -38,6 +38,10 @@ Two-wheelers appear in ~90% of BMD-45's images; Bicycle, Mini-bus, and Tempo-tra
 
 Because a single image can satisfy several classes at once (e.g. a frame with both a bicycle and a truck), the actual number of images selected is typically well below the raw budget cap once every class's target is met — this is expected, not a bug, and the true counts are recorded in `manifest.json` alongside the seed used (`42`, for reproducibility) after each run.
 
+## Operational note: Hugging Face rate limiting on Colab
+
+Colab's shared IP pool trips Hugging Face's Xet transfer protocol's rate limit almost immediately for unauthenticated requests (`429` on the very first download). The subsetting script sets `HF_HUB_DISABLE_XET=1` to fall back to plain HTTP and retries transient failures with exponential backoff; the training notebook additionally supports an optional `HF_TOKEN` Colab secret for a higher rate limit ceiling. None of this was needed running the same script locally (a single, non-shared IP never hit it) — it's specifically a Colab-and-many-anonymous-users problem.
+
 ## Known limitations
 
 - Bengaluru CCTV camera angles/heights and road markings aren't identical to whatever camera setup ends up used for Nepal footage — this is a transfer-learning assumption (detector generalizes across camera geometry reasonably well at the vehicle-detection task), not a guarantee. Worth re-checking once real Nepal footage is available in a later module.

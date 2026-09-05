@@ -15,8 +15,18 @@ Usage:
 
 import argparse
 import json
+import os
 import random
 import shutil
+import time
+
+# Xet (HF's newer chunked-transfer protocol) rate-limits unauthenticated
+# requests hard, and Colab's shared IP pool trips it almost immediately -
+# this must be set before huggingface_hub is imported, since it's read once
+# into a module-level constant at import time. Falls back to plain HTTP,
+# which is slower but far more tolerant of anonymous/shared-IP use.
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -58,9 +68,27 @@ SPLITS = {
 }
 
 
+def _with_retry(fn, *args, retries: int = 6, base_delay: float = 5.0, **kwargs):
+    """Retries transient failures (rate limits, flaky Colab networking) with
+    exponential backoff. Hugging Face's 429s are usually gone within a minute."""
+    for attempt in range(retries):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as exc:
+            if attempt == retries - 1:
+                raise
+            delay = base_delay * (2**attempt)
+            print(f"  download failed ({exc}); retrying in {delay:.0f}s ({attempt + 1}/{retries})")
+            time.sleep(delay)
+
+
 def download_annotations(repo_dir: str, cache_dir: Path) -> dict:
-    path = hf_hub_download(
-        REPO_ID, f"{repo_dir}/_annotations.coco.json", repo_type="dataset", local_dir=str(cache_dir)
+    path = _with_retry(
+        hf_hub_download,
+        REPO_ID,
+        f"{repo_dir}/_annotations.coco.json",
+        repo_type="dataset",
+        local_dir=str(cache_dir),
     )
     with open(path) as f:
         return json.load(f)
@@ -132,11 +160,14 @@ def build_split(split_name: str, cfg: dict, out_dir: Path, seed: int, workers: i
         if dest.exists():
             return image_id, None
         try:
-            src = hf_hub_download(
+            src = _with_retry(
+                hf_hub_download,
                 REPO_ID,
                 f"{cfg['repo_dir']}/{info['file_name']}",
                 repo_type="dataset",
                 local_dir=str(cache_dir),
+                retries=4,
+                base_delay=3.0,
             )
         except Exception as exc:  # a single flaky download shouldn't kill the whole run
             return image_id, str(exc)
