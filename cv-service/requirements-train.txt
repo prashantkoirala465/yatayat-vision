@@ -4,3 +4,5 @@
 # multi-GB ML packages it never imports.
 torch==2.14.0
 ultralytics==8.4.141
+huggingface_hub==1.30.0
+Pillow==12.3.0
