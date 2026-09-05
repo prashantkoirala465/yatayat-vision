@@ -8,3 +8,6 @@ huggingface_hub==1.30.0
 Pillow==12.3.0
 onnx==1.22.0
 onnxruntime==1.29.0
+opencv-python==5.0.0.93
+supervision==0.30.2
+lap==0.5.13
