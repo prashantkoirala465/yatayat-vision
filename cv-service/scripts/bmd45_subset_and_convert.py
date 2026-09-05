@@ -31,6 +31,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from huggingface_hub import hf_hub_download
+from PIL import Image
 
 REPO_ID = "iisc-aim/BMD-45"
 
@@ -148,15 +149,20 @@ def build_split(split_name: str, cfg: dict, out_dir: Path, seed: int, workers: i
     images_dir.mkdir(parents=True, exist_ok=True)
     labels_dir.mkdir(parents=True, exist_ok=True)
 
-    def flat_name(file_name: str) -> str:
+    def flat_stem(file_name: str) -> str:
         rel = Path(file_name)
         # BMD-45 shards images across images_000/, images_001/, ... - namespace
         # the flattened filename by shard so we can't collide on a bare numeric id.
-        return f"{rel.parent.name}__{rel.name}"
+        return f"{rel.parent.name}__{rel.stem}"
 
     def fetch_one(image_id: int):
         info = images_by_id[image_id]
-        dest = images_dir / flat_name(info["file_name"])
+        # BMD-45's source PNGs run ~3.5MB each - at subset scale (thousands of
+        # images) that's tens of GB, easily exhausting a free Google Drive
+        # account. Re-encoding to JPEG here cuts that by roughly 5-10x; quality
+        # 90 is well above what a detector needs and this is a training-input
+        # copy, not an archival one.
+        dest = images_dir / f"{flat_stem(info['file_name'])}.jpg"
         if dest.exists():
             return image_id, None
         try:
@@ -171,7 +177,13 @@ def build_split(split_name: str, cfg: dict, out_dir: Path, seed: int, workers: i
             )
         except Exception as exc:  # a single flaky download shouldn't kill the whole run
             return image_id, str(exc)
-        shutil.copy2(src, dest)
+        try:
+            with Image.open(src) as im:
+                im.convert("RGB").save(dest, "JPEG", quality=90)
+        except Exception as exc:
+            return image_id, f"failed to re-encode as jpeg: {exc}"
+        finally:
+            Path(src).unlink(missing_ok=True)  # reclaim space immediately, don't keep both copies
         return image_id, None
 
     failures = []
@@ -196,7 +208,7 @@ def build_split(split_name: str, cfg: dict, out_dir: Path, seed: int, workers: i
                 continue
             lines.append(f"{CLASS_IDS[bucket]} {x:.6f} {y:.6f} {w:.6f} {h:.6f}")
             seen_buckets.add(bucket)
-        stem = Path(flat_name(info["file_name"])).stem
+        stem = flat_stem(info["file_name"])
         (labels_dir / f"{stem}.txt").write_text("\n".join(lines) + ("\n" if lines else ""))
         for b in seen_buckets:
             bucket_counts[b] += 1
