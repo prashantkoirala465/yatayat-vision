@@ -11,7 +11,7 @@ Nepal mandated new embossed, Devanagari-script vehicle plates for new registrati
 - **Pipeline** (`cv-service/`): FastAPI, YOLO (Ultralytics) for detection, ByteTrack for tracking, OpenCV homography for speed estimation, PaddleOCR + a custom embossed-plate pipeline for reading plates
 - **Dashboard** (`dashboard/`): Next.js, TypeScript, Tailwind
 - **Storage**: Postgres for violation records, Redis + RQ for background video processing jobs
-- **Training**: Google Colab (free tier) — the M1 Air this was built on has no GPU, so all model training happens there and the exported weights run locally for inference
+- **Training**: full training runs happen on Google Colab's free T4 tier — the M1 Air this was built on has no discrete GPU, and a full run there would take hours and thermal-throttle a fanless laptop. Local MPS (Apple Silicon) runs are still used for fast iteration/debugging on a small data subset before committing to the long Colab run
 
 ## Ethics
 
@@ -39,3 +39,15 @@ npm run dev
 ```
 
 See `docs/architecture.md` for how the pieces fit together.
+
+## Working on model training/dataset scripts
+
+`cv-service/scripts/` and `cv-service/notebooks/` need heavier ML dependencies the API service itself doesn't:
+
+```bash
+cd cv-service
+.venv/bin/pip install -r requirements-train.txt
+.venv/bin/python scripts/bmd45_subset_and_convert.py --scale 0.05 --out /tmp/bmd45_debug  # small local subset
+```
+
+That gives a fast local loop for debugging the pipeline (data conversion, training loop, checkpointing, export) on Apple Silicon's MPS backend before running the full-scale job on Colab — see `cv-service/notebooks/train_vehicle_detector.ipynb`.

@@ -5,3 +5,9 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# pretrained/exported model weights - downloaded or produced locally, never committed
+*.pt
+*.onnx
+*.mlpackage/
+runs/

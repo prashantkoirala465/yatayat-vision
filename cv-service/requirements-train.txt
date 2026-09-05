@@ -1,0 +1,6 @@
+# Training/debugging-only dependencies - not needed to run the API service
+# itself, only for scripts/notebooks/ that build datasets and train models.
+# Kept separate from requirements.txt so the deployed service doesn't carry
+# multi-GB ML packages it never imports.
+torch==2.14.0
+ultralytics==8.4.141
