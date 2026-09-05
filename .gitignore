@@ -1,0 +1,38 @@
+# Node
+node_modules/
+.next/
+out/
+npm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# Docker volumes
+pgdata/
+
+# Local data / model artifacts - never committed, see data/README.md
+/data/*
+!/data/README.md
+
+# Agent tooling files regenerated locally
+AGENTS.md
+CLAUDE.md
