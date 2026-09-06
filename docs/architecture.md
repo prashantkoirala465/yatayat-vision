@@ -27,6 +27,29 @@ plate localization + OCR (legacy painted -> PaddleOCR; embossed Devanagari -> cu
 violation dedup (per-track state machine) --> Postgres --> dashboard
 ```
 
+## Deployed shape
+
+```mermaid
+flowchart LR
+    browser["browser"]
+    subgraph containers ["docker compose --profile full"]
+        dashboard["dashboard\n(Next.js, :3000)"]
+        cvapi["cv-api\n(FastAPI, :8000)"]
+        cvworker["cv-worker\n(RQ, no ML on API path)"]
+        pg[("postgres")]
+        redis[("redis")]
+    end
+    browser -- "page load" --> dashboard
+    browser -- "fetch (NEXT_PUBLIC_API_URL)" --> cvapi
+    dashboard -. "no direct DB access" .-x pg
+    cvapi --> pg
+    cvapi -- "enqueue job" --> redis
+    cvworker -- "dequeue job" --> redis
+    cvworker --> pg
+```
+
+`dashboard` and `cv-api` are two separate containers the browser talks to directly (not to each other server-side) — see `docs/deployment.md` for how this is built and why it isn't hosted continuously.
+
 ## Why this split
 
 Same reasoning as this project's sibling (Cortex): a real service boundary between the CV/ML backend and the review UI, rather than one monolithic app, mirrors how a production system like this would actually be composed — the pipeline is the part that has real compute/model requirements, the dashboard is a thin consumer of its output.

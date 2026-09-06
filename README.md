@@ -48,6 +48,17 @@ A video uploaded through the dashboard sits queued until the worker is running. 
 
 See `docs/architecture.md` for how the pieces fit together.
 
+## Fully containerized demo
+
+The above runs each piece on the host for fast iteration (hot reload). To run the whole system as containers instead - useful for a clean, reproducible demo rather than day-to-day development:
+
+```bash
+cd infra
+docker compose --profile full up --build
+```
+
+This builds and starts postgres, redis, the API server, the worker (needs `cv-service/data/models/*.pt` to already exist locally - see `cv-service/data/README.md`), and the dashboard, all wired together. Dashboard at `http://localhost:3000`, API at `http://localhost:8000`. See `docs/deployment.md` for why this is a demo-time setup rather than an always-on hosted service.
+
 ## Working on model training/dataset scripts
 
 `cv-service/scripts/` and `cv-service/notebooks/` need heavier ML dependencies the API service itself doesn't:
