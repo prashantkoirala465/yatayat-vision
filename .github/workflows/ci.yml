@@ -64,3 +64,13 @@ jobs:
       - run: python -c "from app.main import app"
       - run: alembic upgrade head
       - run: pytest -v
+
+  docker-build:
+    # Only builds the two lean images - cv-worker needs trained model
+    # weights baked in at build time (data/models/*.pt), which are
+    # gitignored and don't exist in CI. See docs/deployment.md.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f infra/Dockerfile.cv-service-api -t yatayat-cv-api cv-service
+      - run: docker build -f infra/Dockerfile.dashboard -t yatayat-dashboard dashboard
