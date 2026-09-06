@@ -1,4 +1,21 @@
-# Legacy plate OCR (Module 5)
+# Legacy plate localization + OCR (Module 5)
+
+## Plate detector
+
+Fine-tuned YOLO11n, 50 epochs on Colab's free T4, on the Kaggle Nepal plate dataset (`docs/data-cards/nepal-plates-kaggle.md`). Final epoch on held-out val:
+
+| Metric | Value |
+|---|---|
+| Precision | 0.977 |
+| Recall | 0.961 |
+| mAP50 | 0.992 |
+| mAP50-95 | 0.925 |
+
+Substantially stronger than the vehicle detector (Module 1: mAP50 0.810) — plate localization is a genuinely easier task (a single, visually distinctive, high-contrast rectangular region vs. six visually-varied vehicle classes). A local 2-epoch smoke test on the M1 had already hit mAP50 0.948 before the full Colab run, which is why this module didn't need the same subsetting/quota work Module 1's BMD-45 pipeline did — the dataset was small enough and the task easy enough to just use directly.
+
+**End-to-end verification** (real trained detector, not ground-truth boxes): ran detect → crop → OCR on 5 fresh images. All 5 plates localized correctly at 0.93–0.96 confidence; 2 of 5 produced a validated registration number. Manually cross-checked one against the visible plate text — `२०५०` — read correctly.
+
+## OCR
 
 `app/plates/ocr_legacy.py` reads the registration-number line of a painted Nepal plate crop via PaddleOCR's Devanagari recognizer (`devanagari_PP-OCRv5_mobile_rec`); `app/plates/format_validator.py` accepts/rejects the result.
 
@@ -20,7 +37,7 @@ avg confidence (passed): 0.77
 avg confidence (failed): 0.41
 ```
 
-An 8% clean-read rate sounds low in isolation, but it's consistent with a separate finding: manually inspecting 8 random ground-truth crops earlier showed 6 of 8 were illegible to a human eye (motion blur, low resolution) — see `docs/data-cards/nepal-plates-kaggle.md`. Most of this dataset's images simply don't contain enough signal for any OCR approach to read reliably; the pipeline reads well when the crop is actually legible (0.77 avg confidence on passing reads) and correctly reports "unreadable" (via the nullable `plate_text`/`number_text` design) rather than fabricating a confident-looking wrong answer on the rest.
+An 8% clean-read rate sounds low in isolation, but it's consistent with a separate finding: manually inspecting 8 random ground-truth crops earlier showed 6 of 8 were illegible to a human eye (motion blur, low resolution) — see `docs/data-cards/nepal-plates-kaggle.md`. Most of this dataset's images simply don't contain enough signal for any OCR approach to read reliably; the pipeline reads well when the crop is actually legible (0.77 avg confidence on passing reads) and correctly reports "unreadable" (via the nullable `plate_text`/`number_text` design) rather than fabricating a confident-looking wrong answer on the rest. (The end-to-end check below passed 2/5 — a higher rate, but n=5 is too small to read anything into that beyond "consistent with 8% at this sample size.")
 
 ## Motorcycle plate check (the plan's called-out hardest case)
 
