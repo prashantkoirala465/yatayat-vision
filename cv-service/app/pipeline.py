@@ -18,6 +18,7 @@ from app.db import SessionLocal
 from app.models import Violation
 from app.plates.localization import PlateLocalizer
 from app.plates.ocr_legacy import read_legacy_plate
+from app.streaming.frame_source import simulate_live
 from app.tracking.tracker import VehicleTracker
 from app.tracking.violation_state_machine import ViolationStateMachine
 
@@ -41,6 +42,11 @@ class PipelineConfig:
     debounce_frames: int = 5
     evidence_dir: str = "/tmp/violation_evidence"
     min_confidence: float = DEFAULT_MIN_CONFIDENCE
+    # Module 7: paces a recorded file to arrive like a live feed, for the
+    # public-facing demo fallback (docs/models/live_streaming.md). Batch
+    # processing (the default) and a real rtsp:// source both ignore this -
+    # a real stream already arrives at its own pace.
+    simulate_live: bool = False
 
 
 def process_video(source: str, source_id: str, config: PipelineConfig) -> int:
@@ -56,9 +62,13 @@ def process_video(source: str, source_id: str, config: PipelineConfig) -> int:
     track_positions: dict[int, deque] = {}
     flagged_count = 0
 
+    frames = tracker.track_with_frames(source)
+    if config.simulate_live:
+        frames = simulate_live(frames, config.fps)
+
     session = SessionLocal()
     try:
-        for frame_index, (frame, tracks) in enumerate(tracker.track_with_frames(source)):
+        for frame_index, (frame, tracks) in enumerate(frames):
             for det in tracks.detections:
                 if det.confidence < config.min_confidence:
                     continue
