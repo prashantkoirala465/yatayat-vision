@@ -27,7 +27,18 @@ async def create_job(file: UploadFile, speed_limit_kmh: float = 100.0, simulate_
     # in the full ML stack (ultralytics, opencv, paddleocr), which only the
     # RQ worker process needs, not the API server itself.
     job = video_queue.enqueue(
-        "app.tasks.process_video_job", str(dest), source_id, speed_limit_kmh, fps=25.0, simulate_live=simulate_live
+        "app.tasks.process_video_job",
+        str(dest),
+        source_id,
+        speed_limit_kmh,
+        fps=25.0,
+        simulate_live=simulate_live,
+        # RQ's 180s default assumes a lightweight job - this one runs a real
+        # detector+tracker+OCR pipeline on CPU, which is genuinely slow (and
+        # much slower still under the amd64 emulation the worker image
+        # needs on Apple Silicon, see docs/deployment.md). Caught by an
+        # actual timeout on real container hardware, not guessed.
+        job_timeout=1800,
     )
     return JobCreateResponse(job_id=job.id, source_id=source_id)
 

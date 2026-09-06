@@ -1,3 +1,10 @@
+# `docker compose up` here brings up the whole system, containers included -
+# postgres/redis alone (no --profile flag) is still enough for the
+# host-based dev workflow in README.md; add `--profile full` to also build
+# and run the cv-service api/worker and the dashboard. See
+# docs/deployment.md for why this is a demo-time compose file, not a
+# continuously-running hosted deployment.
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -25,5 +32,66 @@ services:
       timeout: 5s
       retries: 5
 
+  cv-api:
+    profiles: ["full"]
+    build:
+      context: ../cv-service
+      dockerfile: ../infra/Dockerfile.cv-service-api
+    environment:
+      DATABASE_URL: postgresql+psycopg://yatayat:yatayat@postgres:5432/yatayat
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    # cv-api writes uploads here and reads evidence frames/plate crops back
+    # from here - cv-worker is a separate container with its own filesystem,
+    # so both need the same volumes mounted at the same paths, or the
+    # worker can't find what the API wrote (and vice versa). Caught this by
+    # actually uploading a video through the running containers, not by
+    # inspection - see docs/deployment.md.
+    volumes:
+      - uploads:/tmp/yatayat_uploads
+      - evidence:/tmp/violation_evidence
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  cv-worker:
+    profiles: ["full"]
+    # paddlepaddle only ships Linux wheels for x86_64, not aarch64 (verified
+    # via PyPI's file listing) - forcing amd64 here lets this build on an
+    # Apple Silicon host via emulation, and matches the architecture most
+    # cloud hosts actually run on anyway.
+    platform: linux/amd64
+    build:
+      context: ../cv-service
+      dockerfile: ../infra/Dockerfile.cv-service-worker
+    environment:
+      DATABASE_URL: postgresql+psycopg://yatayat:yatayat@postgres:5432/yatayat
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - uploads:/tmp/yatayat_uploads
+      - evidence:/tmp/violation_evidence
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  dashboard:
+    profiles: ["full"]
+    build:
+      context: ../dashboard
+      dockerfile: ../infra/Dockerfile.dashboard
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - cv-api
+
 volumes:
   pgdata:
+  uploads:
+  evidence:
