@@ -1,0 +1,30 @@
+# The worker is the other half of the API/worker split documented in
+# docs/architecture.md: same codebase, but this process actually runs the
+# pipeline (ultralytics, opencv, paddleocr, torch), so it's a much bigger
+# image than Dockerfile.cv-service-api and takes real minutes to build.
+#
+# Model weights (data/models/*.pt) are gitignored (too large, regenerable -
+# see cv-service/data/README.md) but this Dockerfile bakes them into the
+# image anyway: they must already exist on disk before `docker build` runs
+# here, same as running the worker locally. There's no registry this
+# project publishes trained weights to.
+
+FROM python:3.12-slim
+WORKDIR /app
+
+# libGL/libglib for opencv, libgomp for paddlepaddle's OpenMP dependency
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 libglib2.0-0 libgomp1 libsm6 libxext6 libxrender1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt requirements-train.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-train.txt
+
+COPY app ./app
+COPY data/models ./data/models
+
+# RQ's default fork-per-job worker is fine here - the fork-safety crash this
+# needs OBJC_DISABLE_INITIALIZE_FORK_SAFETY for is a macOS-only issue (see
+# README.md), not a concern on this image's Linux base.
+ENV REDIS_URL=redis://redis:6379/0
+CMD ["sh", "-c", "rq worker video_processing --url ${REDIS_URL}"]
