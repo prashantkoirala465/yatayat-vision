@@ -6,7 +6,7 @@ Pure logic, no video/DB dependency — covered by real unit tests (`tests/test_v
 
 ## Schema
 
-`violations` table (`app/models.py`, migrated via Alembic): `source_id` + `track_id` (unique together — a DB-level backstop on top of the state machine's own single-flag guarantee), `detected_at`, `speed_kmh`, `evidence_frame_path`, `plate_crop_path`/`plate_text` (nullable until Module 5 wires in plate OCR), `status` (defaults to `pending_review`, for the Module 6 human-review workflow).
+`violations` table (`app/models.py`, migrated via Alembic): `source_id` + `track_id` (unique together — a DB-level backstop on top of the state machine's own single-flag guarantee), `detected_at`, `speed_kmh`, `evidence_frame_path`, `plate_crop_path`/`plate_text` (nullable — populated when Module 5's plate localization+OCR finds and reads a plate on the flagged frame, null otherwise), `status` (defaults to `pending_review`, for the Module 6 human-review workflow).
 
 ## End-to-end verification, and a real bug it caught
 
@@ -26,5 +26,11 @@ Verified in Postgres directly (`source_id`, `track_id`, `speed_kmh`, `status='pe
 ## Known limitations (by design, not oversight)
 
 - The illustrative calibration means the *speed number* for this specific clip isn't trustworthy — the point of this demo was the pipeline wiring and the confidence-filter fix, both of which are real.
-- A confidence floor is a real improvement but not a complete one — a false positive that happened to sit above 0.4 for 5+ consecutive frames would still slip through. No further heuristic is layered on top right now; the honest position (also true of the Module 2 movement/confidence attempts) is that this needs more signal than track-level speed+confidence alone, which is exactly what plate verification (Module 5) will add for anything that actually reaches a human reviewer.
+- A confidence floor is a real improvement but not a complete one — a false positive that happened to sit above 0.4 for 5+ consecutive frames would still slip through. No further heuristic is layered on top right now; the honest position (also true of the Module 2 movement/confidence attempts) is that this needs more signal than track-level speed+confidence alone, which is exactly what plate verification (Module 5) adds for anything that actually reaches a human reviewer.
 - ID-switch-driven double-counting (Module 3's plan) remains an accepted MVP limitation, unchanged this module.
+
+## Plate localization + OCR wired in (Module 5 follow-up)
+
+`scripts/violation_demo.py` now crops the vehicle's own bbox from the flagged frame, runs Module 5's `PlateLocalizer` on that crop, and (if a plate is found) runs `read_legacy_plate` on it — populating `plate_crop_path`/`plate_text` on the same Violation row, still nullable when nothing is found or nothing passes validation. Runs once per flagged violation, not per frame — matches the plan's throttling design for this expensive step.
+
+Re-ran the demo after wiring this in: the one flagged vehicle (a European car in the Module 2/3/4 highway clip) got `plate=None`. Checked this wasn't a bug or an overly strict threshold — re-ran the localizer directly on that exact vehicle crop down to `conf=0.05` and still found nothing, then looked at the crop itself: it's a front-on shot where no plate is actually visible at that angle. Correct behavior, not a defect — the nullable design exists precisely for cases like this, and this is genuinely the first real test of it landing as expected rather than by construction.
