@@ -37,7 +37,14 @@ cd dashboard
 cp ../.env.example .env.local
 npm install
 npm run dev
+
+# 4. background worker (new terminal) - processes uploaded videos: detect, track, speed, plate OCR
+cd cv-service
+.venv/bin/pip install -r requirements-train.txt  # the worker needs the full ML stack the API server doesn't
+OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES .venv/bin/rq worker video_processing --url redis://localhost:6379/0
 ```
+
+A video uploaded through the dashboard sits queued until the worker is running. `OBJC_DISABLE_INITIALIZE_FORK_SAFETY` is only needed on macOS - RQ's default worker forks a subprocess per job, and macOS's Objective-C runtime crashes on fork() unless that guard is disabled. Not needed on Linux (including wherever this ends up deployed).
 
 See `docs/architecture.md` for how the pieces fit together.
 

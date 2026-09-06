@@ -3,6 +3,7 @@
 ## Services
 
 - **`cv-service/`** (FastAPI, Python) — owns Postgres and the entire CV pipeline: vehicle detection, tracking, speed estimation, plate localization, OCR, and violation deduplication. Long-running video/stream processing runs as background jobs via Redis + RQ.
+  - The API server process and the RQ worker process are the same codebase but genuinely different runtime footprints: the API server (`app/main.py`) only needs FastAPI/SQLAlchemy/Redis-the-client to list violations and enqueue jobs, while the worker needs the full ML stack (Ultralytics, OpenCV, PaddleOCR, PyTorch) to actually run the pipeline. Jobs are enqueued by string import path (`"app.tasks.process_video_job"`), not a direct function reference, specifically so the API server never imports that heavy stack at all — see `docs/models/dashboard.md`.
 - **`dashboard/`** (Next.js, TypeScript) — a pure API client. It has no direct database access; every violation record it shows comes from `cv-service`'s API.
 
 ## Pipeline (built up module by module — see the project plan for the full roadmap)
