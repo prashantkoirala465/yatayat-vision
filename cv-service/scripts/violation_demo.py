@@ -37,6 +37,11 @@ def main():
     parser.add_argument("--debounce-frames", type=int, default=5)
     parser.add_argument("--evidence-dir", default="/tmp/violation_evidence")
     parser.add_argument("--source-id", default=None, help="defaults to the source filename")
+    parser.add_argument(
+        "--simulate-live",
+        action="store_true",
+        help="pace a recorded file to arrive like a live feed, instead of processing it as fast as possible",
+    )
     args = parser.parse_args()
 
     source_id = args.source_id or Path(args.source).name
@@ -49,6 +54,7 @@ def main():
         speed_limit_kmh=args.speed_limit,
         debounce_frames=args.debounce_frames,
         evidence_dir=args.evidence_dir,
+        simulate_live=args.simulate_live,
     )
     count = process_video(args.source, source_id, config)
     print(f"done. {count} violation(s) flagged and written to the database")

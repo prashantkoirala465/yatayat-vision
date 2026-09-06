@@ -1,8 +1,10 @@
 import io
 
 from fastapi.testclient import TestClient
+from rq.job import Job
 
 from app.main import app
+from app.queue import redis_conn
 
 client = TestClient(app)
 
@@ -17,6 +19,26 @@ def test_create_job_enqueues_and_returns_job_id():
     body = response.json()
     assert body["job_id"]
     assert body["source_id"].endswith("test.mp4")
+
+
+def test_create_job_defaults_simulate_live_to_false():
+    response = client.post(
+        "/jobs",
+        files={"file": ("test3.mp4", io.BytesIO(b"placeholder bytes"), "video/mp4")},
+        data={"speed_limit_kmh": 100.0},
+    )
+    job = Job.fetch(response.json()["job_id"], connection=redis_conn)
+    assert job.kwargs["simulate_live"] is False
+
+
+def test_create_job_passes_simulate_live_through_to_the_enqueued_job():
+    response = client.post(
+        "/jobs?simulate_live=true",
+        files={"file": ("test4.mp4", io.BytesIO(b"placeholder bytes"), "video/mp4")},
+        data={"speed_limit_kmh": 100.0},
+    )
+    job = Job.fetch(response.json()["job_id"], connection=redis_conn)
+    assert job.kwargs["simulate_live"] is True
 
 
 def test_job_status_for_unknown_job_is_404():
