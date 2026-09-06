@@ -29,6 +29,7 @@ cd infra && docker compose up -d
 cd cv-service
 cp ../.env.example .env
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/alembic upgrade head
 .venv/bin/uvicorn app.main:app --reload
 
 # 3. frontend (new terminal)
