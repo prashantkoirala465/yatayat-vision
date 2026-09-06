@@ -11,6 +11,7 @@ export default function ViolationsPage() {
 
   const [file, setFile] = useState<File | null>(null);
   const [speedLimit, setSpeedLimit] = useState(100);
+  const [simulateLive, setSimulateLive] = useState(false);
   const [job, setJob] = useState<JobStatus | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -38,7 +39,7 @@ export default function ViolationsPage() {
     if (!file) return;
     setUploadError(null);
     try {
-      const created = await createJob(file, speedLimit);
+      const created = await createJob(file, speedLimit, simulateLive);
       setJob({ job_id: created.job_id, status: "queued", result: null, error: null });
     } catch (err) {
       setUploadError(String(err));
@@ -68,6 +69,14 @@ export default function ViolationsPage() {
             className="w-24 rounded border border-line bg-transparent px-2 py-1 text-sm text-zinc-50"
           />
         </div>
+        <label className="flex items-center gap-1.5 pb-1.5 text-xs text-muted">
+          <input
+            type="checkbox"
+            checked={simulateLive}
+            onChange={(e) => setSimulateLive(e.target.checked)}
+          />
+          simulate live feed
+        </label>
         <button
           type="submit"
           disabled={!file}

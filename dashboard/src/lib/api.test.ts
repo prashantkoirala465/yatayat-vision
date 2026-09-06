@@ -88,6 +88,17 @@ describe("createJob", () => {
     expect(options.method).toBe("POST");
     expect(options.body).toBeInstanceOf(FormData);
   });
+
+  it("omits simulate_live by default and sends it as a query param when true", async () => {
+    const fetchMock = mockFetchOnce({ job_id: "abc", source_id: "x.mp4" });
+    const file = new File([new Uint8Array([1, 2, 3])], "test.mp4", { type: "video/mp4" });
+
+    await createJob(file, 42);
+    expect((fetchMock.mock.calls[0][0] as URL).searchParams.has("simulate_live")).toBe(false);
+
+    await createJob(file, 42, true);
+    expect((fetchMock.mock.calls[1][0] as URL).searchParams.get("simulate_live")).toBe("true");
+  });
 });
 
 describe("getJobStatus", () => {

@@ -64,11 +64,16 @@ export function plateCropUrl(id: number): string {
   return `${API_URL}/violations/${id}/plate-crop`;
 }
 
-export async function createJob(file: File, speedLimitKmh: number): Promise<JobCreateResponse> {
+export async function createJob(
+  file: File,
+  speedLimitKmh: number,
+  simulateLive = false,
+): Promise<JobCreateResponse> {
   const formData = new FormData();
   formData.append("file", file);
   const url = new URL(`${API_URL}/jobs`);
   url.searchParams.set("speed_limit_kmh", String(speedLimitKmh)); // a query param, not a form field - see docs/models
+  if (simulateLive) url.searchParams.set("simulate_live", "true");
   return handleResponse(await fetch(url, { method: "POST", body: formData }));
 }
 
